@@ -4,6 +4,8 @@ Automated end-to-end testing suites using Playwright.
 
 **[View Manual Test Cases](TEST_CASES.md)**
 
+**[View 10 latest test reports](https://fleks-dev.github.io/saucedemo-reports/)**
+
 ## 📖 What You'll Learn
 
 This guide will help you:
@@ -48,7 +50,12 @@ git clone git@github.com:fleks-dev/saucedemo.git
 ## 📁 Project Structure
 
 ```
-playwright-boilerplate/
+saucedemo-playwright/
+├── .github/                           # GitHub Actions workflows
+│   └── workflows/
+│       ├── manual-trigger.yml         # Trigger any test suite manually
+│       ├── smoke.yml                  # Run pre-defined set of smoke tests
+│       └── test-orchestration.yml     # Workflow orchestrator
 ├── configs/                           # Playwright configuration files
 │   └── [config-name].config.ts        # Team-specific test configs
 ├── fixtures/                          # Test data and files
@@ -61,7 +68,7 @@ playwright-boilerplate/
 │   ├── base-test.ts                   # Base test configuration
 │   ├── global-setup.ts                # Global test setup
 │   ├── global-teardown.ts             # Global test cleanup
-│   └── team-[name]/                   # Team-specific test suites
+│   └── feature-[name]/                # Feature-specific test suites
 │       └── [test-suite]/
 ├── playwright.config.ts               # Main Playwright configuration
 └── package.json
@@ -219,6 +226,51 @@ Removes:
 - `playwright-reports/` - JUnit XML and JSON result files
 - `playwright-test-results/` - Additional test result files
 
+## 🚀 CI/CD GitHub Actions
+
+This project uses GitHub Actions for Continuous Integration and Continuous Deployment. The workflows are defined in `.github/workflows/`.
+
+### Workflows
+
+#### 1. Manual Trigger (`manual-trigger.yml`)
+
+Allows you to manually trigger any test suite from the GitHub Actions UI.
+
+- **Trigger**: Manual (`workflow_dispatch`)
+- **Inputs**:
+  - `test_configs`: Test suites to run (e.g., `"product-page"`, `"cart"`). Default: `"checkout"`.
+  - `baseURL`: Base URL to test against. Default: `https://www.saucedemo.com`.
+  - `runner`: GitHub runner to use. Default: `ubuntu-latest`.
+
+#### 2. Smoke Tests (`smoke.yml`)
+
+Runs a critical set of tests to ensure the platform's health.
+
+- **Trigger**:
+  - **Scheduled**: Every weekday at 8:00 AM.
+  - **Manual**: Can be triggered manually.
+- **Tests**: Runs `checkout`, `authentication`, and `cart` suites.
+
+#### 3. Test Orchestration (`test-orchestration.yml`)
+
+A **reusable workflow** that handles the actual test execution logic. It is called by other workflows (like Manual Trigger and Smoke Tests).
+
+**Key Features**:
+
+- **Setup**: Installs Node.js and dependencies.
+- **Caching**: Caches Playwright browsers to speed up execution.
+- **Execution**: Runs tests based on inputs (suites, patterns, grep).
+- **Reporting**: Checks for blob reports, combines them, and deploys the final HTML report.
+
+### Reusable Actions
+
+The workflows utilize custom composite actions located in `.github/actions/`:
+
+- **`combine-reports`**: Merges blob reports from sharded test runs into a single report.
+- **`deploy-reports`**: Deploys the generated HTML report to the [saucedemo-reports](https://github.com/fleks-dev/saucedemo-reports) repository and updates its README with the 10 latest test reports.
+
+The reports are available at the github page [saucedemo-reports](https://github.com/fleks-dev/saucedemo-reports).
+
 ## 🛠️ Development
 
 ### Writing Tests
@@ -309,6 +361,61 @@ This opens a browser with developer tools where you can:
 - Inspect elements
 - View console logs
 - Take screenshots
+
+## 🐳 Docker
+
+You can run tests in a Docker container to ensure a consistent environment.
+
+### Prerequisites
+
+- [Docker](https://www.docker.com/get-started) installed on your machine.
+
+### Build the Docker Image
+
+Build the Docker image using the provided `Dockerfile`. This will install all dependencies and browsers required by Playwright.
+
+```bash
+docker build -t saucedemo-playwright .
+```
+
+### Run Tests in Docker
+
+Run the tests inside the container. To access the test reports generated inside the container, you need to mount a volume mapping the container's report directory to a local directory.
+
+**PowerShell (Windows):**
+
+```powershell
+docker run --rm -v ${PWD}/playwright-report:/app/playwright-report saucedemo-playwright
+```
+
+**Bash (Linux/macOS):**
+
+```bash
+docker run --rm -v $(pwd)/playwright-report:/app/playwright-report saucedemo-playwright
+```
+
+**Command Prompt (Windows):**
+
+```cmd
+docker run --rm -v %cd%/playwright-report:/app/playwright-report saucedemo-playwright
+```
+
+After the tests complete, you can find the HTML report in your local `playwright-report` directory.
+
+### Dockerfile Overview
+
+The `Dockerfile` performs the following steps:
+
+1.  **Base Image**: Uses `mcr.microsoft.com/playwright:v1.40.0-jammy` which includes Node.js and Playwright browsers.
+2.  **Dependencies**: Copies `package.json` and runs `npm ci` to clean install dependencies.
+3.  **Source Code**: Copies the project files into the `/app` directory.
+4.  **Execution**: Runs `npm test` by default.
+
+To reference specific files in the container or debug, you can override the default command:
+
+```bash
+docker run --rm -it saucedemo-playwright /bin/bash
+```
 
 ## 📚 Resources
 
