@@ -270,7 +270,7 @@ The workflows utilize custom composite actions located in `.github/actions/`:
 - **`combine-reports`**: Merges blob reports from sharded test runs into a single report.
 - **`deploy-reports`**: Deploys the generated HTML report to the [saucedemo-reports](https://github.com/fleks-dev/saucedemo-reports) repository and updates its README with the 10 latest test reports.
 
-The reports are available at the github page [saucedemo-reports](https://github.com/fleks-dev/saucedemo-reports).
+The reports are available at the github page [saucedemo-reports](https://fleks-dev.github.io/saucedemo-reports/).
 
 ## 🛠️ Development
 
