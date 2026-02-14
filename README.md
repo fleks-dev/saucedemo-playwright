@@ -36,16 +36,17 @@ git clone git@github.com:fleks-dev/saucedemo.git
 
 2. **Install dependencies**
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-   This will automatically install Playwright and all browser engines.
+This will automatically install Playwright and all browser engines.
 
 3. **Verify installation**
-   ```bash
-   npx playwright --version
-   ```
+
+```bash
+npx playwright --version
+```
 
 ## 📁 Project Structure
 
