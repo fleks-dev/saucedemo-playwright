@@ -1,4 +1,4 @@
-# Playwright Boilerplate
+# Saucedemo Playwright
 
 Automated end-to-end testing suites using Playwright.
 
