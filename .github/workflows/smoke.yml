@@ -1,0 +1,26 @@
+# Smoke Tests - Critical user flows and platform health checks
+name: Smoke Tests
+
+on:
+  schedule:
+    # Run every morning during weekdays at 8AM
+    - cron: '0 8 * * 1-5'
+
+  workflow_dispatch:
+    inputs:
+      baseURL:
+        description: 'Base URL to test against (default: https://www.saucedemo.com)'
+        required: false
+        default: 'https://www.saucedemo.com'
+
+jobs:
+  smoke_tests:
+    uses: ./.github/workflows/test-orchestration.yml
+    secrets:
+      AUTOMATION_REPORTS_ACCESS_TOKEN: ${{ secrets.AUTOMATION_REPORTS_ACCESS_TOKEN }}
+    with:
+      runner: ubuntu-latest
+      feature-name: 'smoke'
+      test-matrix: '["checkout", "authentication", "cart"]'
+      base-url: ${{ github.event.inputs.baseURL || 'https://www.saucedemo.com' }}
+      trigger: ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual Trigger' }}

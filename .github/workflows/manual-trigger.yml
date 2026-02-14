@@ -1,0 +1,33 @@
+name: Manual Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_configs:
+        description: 'Test suites to run (enter as: "product-page", "cart")'
+        required: true
+        type: string
+        default: '"checkout"'
+      baseURL:
+        description: 'Base URL to test against (e.g. https://www.saucedemo.com)'
+        required: false
+        default: ''
+      runner:
+        description: 'Runner to use for tests'
+        required: false
+        type: choice
+        options:
+          - ubuntu-latest
+        default: ubuntu-latest
+
+jobs:
+  run_tests:
+    uses: ./.github/workflows/test-orchestration.yml
+    secrets:
+      AUTOMATION_REPORTS_ACCESS_TOKEN: ${{ secrets.AUTOMATION_REPORTS_ACCESS_TOKEN }}
+    with:
+      feature-name: manual
+      test-matrix: ${{ format('[{0}]', github.event.inputs.test_configs) }}
+      base-url: ${{ github.event.inputs.baseURL || 'https://www.saucedemo.com' }}
+      trigger: 'Manual Trigger'
+      runner: ${{ github.event.inputs.runner }}

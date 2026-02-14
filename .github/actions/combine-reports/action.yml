@@ -1,0 +1,154 @@
+name: Combine Playwright Reports
+description: Downloads and merges blob reports into a single unified Playwright HTML report
+
+inputs:
+  feature-name:
+    description: 'Feature name for artifact naming'
+    required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+
+outputs:
+  total_tests:
+    description: 'Total number of tests'
+    value: ${{ steps.test_summary.outputs.total_tests }}
+  passed_tests:
+    description: 'Number of passed tests'
+    value: ${{ steps.test_summary.outputs.passed_tests }}
+  failed_tests:
+    description: 'Number of failed tests'
+    value: ${{ steps.test_summary.outputs.failed_tests }}
+  skipped_tests:
+    description: 'Number of skipped tests'
+    value: ${{ steps.test_summary.outputs.skipped_tests }}
+  status:
+    description: 'Overall test status'
+    value: ${{ steps.test_summary.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        echo 'fetch-retries=5' >> ./.npmrc
+        npm ci --prefer-offline --no-audit --no-fund
+        # Remove .npmrc configuration
+        if [[ "$OSTYPE" == "darwin"* ]]
+        then
+          sed -i '' -e '/fetch-retries/d' .npmrc
+        else
+          sed -i  '/fetch-retries/d' .npmrc
+        fi
+
+    - name: Download blob reports
+      uses: actions/download-artifact@v4
+      with:
+        path: all-blob-reports
+        pattern: test-report-*
+
+    - name: Merge blob reports into single Playwright HTML report
+      shell: bash
+      run: |
+        # Create reports directory
+        mkdir -p playwright-reports merged-blob-reports
+
+        echo "📦 Downloaded blob reports:"
+        ls -la all-blob-reports/
+
+        # Copy blob report zip files with unique names to prevent overwrites
+        echo "📋 Collecting blob reports..."
+        counter=1
+        for report_dir in all-blob-reports/test-report-*/; do
+          if [ -d "$report_dir" ]; then
+            suite_name=$(basename "$report_dir" | sed 's/test-report-//')
+            
+            # Find report.zip in blob-report/ subdirectory
+            if [ -f "$report_dir/blob-report/report.zip" ]; then
+              cp "$report_dir/blob-report/report.zip" "merged-blob-reports/report-$counter.zip"
+              echo "   ✓ Copied $suite_name as report-$counter.zip"
+              counter=$((counter + 1))
+            # Fallback: check root level
+            elif [ -f "$report_dir/report.zip" ]; then
+              cp "$report_dir/report.zip" "merged-blob-reports/report-$counter.zip"
+              echo "   ✓ Copied $suite_name as report-$counter.zip"
+              counter=$((counter + 1))
+            fi
+          fi
+        done
+
+        echo "📊 Merged blob reports:"
+        ls -lh merged-blob-reports/
+
+        # Create merge config to handle different test directories
+        cat > merge.config.ts << 'EOF'
+        import { defineConfig } from '@playwright/test';
+
+        export default defineConfig({
+          testDir: './tests',
+        });
+        EOF
+
+        echo "✅ Created merge config"
+
+        # Merge all blob reports into single unified Playwright HTML report
+        echo "🔀 Merging blob reports into single Playwright report..."
+        npx playwright merge-reports --reporter html -c merge.config.ts merged-blob-reports
+
+        # Also generate JSON report  
+        npx playwright merge-reports --reporter json -c merge.config.ts merged-blob-reports > playwright-reports/test-results.json
+
+        # Generate JUnit XML report
+        npx playwright merge-reports --reporter junit -c merge.config.ts merged-blob-reports > playwright-reports/junit-results.xml
+
+        echo "✅ Single unified Playwright report created!"
+
+    - name: Prepare test summary
+      id: test_summary
+      shell: bash
+      run: |
+        TOTAL_TESTS=0
+        PASSED_TESTS=0
+        FAILED_TESTS=0
+        SKIPPED_TESTS=0
+
+        # Parse the merged JSON report
+        if [ -f "playwright-reports/test-results.json" ]; then
+          EXPECTED=$(jq -r '.stats.expected // 0' playwright-reports/test-results.json 2>/dev/null || echo "0")
+          UNEXPECTED=$(jq -r '.stats.unexpected // 0' playwright-reports/test-results.json 2>/dev/null || echo "0")
+          SKIPPED=$(jq -r '.stats.skipped // 0' playwright-reports/test-results.json 2>/dev/null || echo "0")
+          
+          PASSED_TESTS=$EXPECTED
+          FAILED_TESTS=$UNEXPECTED
+          SKIPPED_TESTS=$SKIPPED
+          TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS + SKIPPED_TESTS))
+        fi
+
+        echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+        echo "passed_tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
+        echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+        echo "skipped_tests=$SKIPPED_TESTS" >> $GITHUB_OUTPUT
+
+        # Determine status
+        if [ "$FAILED_TESTS" -gt 0 ]; then
+          echo "status=❌ FAILED" >> $GITHUB_OUTPUT
+        else
+          echo "status=✅ PASSED" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload unified report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report-${{ inputs.feature-name }}
+        path: |
+          playwright-report/
+          playwright-reports/
+        retention-days: 7

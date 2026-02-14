@@ -1,0 +1,207 @@
+name: Test Orchestration
+
+on:
+  workflow_call:
+    inputs:
+      feature-name:
+        description: 'Feature name'
+        required: false
+        type: string
+        default: ''
+      test-matrix:
+        description: 'JSON string of test suites to run'
+        required: false
+        type: string
+        default: ''
+      test-pattern:
+        description: 'Test pattern to run (e.g., "smoke", "regression", or specific test file)'
+        required: false
+        type: string
+        default: ''
+      base-url:
+        description: 'Base URL to test against'
+        required: false
+        type: string
+        default: 'https://www.saucedemo.com'
+      environment:
+        description: 'Environment name'
+        required: false
+        type: string
+        default: 'staging'
+      trigger:
+        description: 'How the test was triggered'
+        required: false
+        type: string
+        default: 'automated'
+      headed:
+        description: 'Run tests in headed mode'
+        required: false
+        type: boolean
+        default: false
+      debug:
+        description: 'Run tests in debug mode'
+        required: false
+        type: boolean
+        default: false
+      runner:
+        description: 'Runner to use for tests'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+    secrets:
+      AUTOMATION_REPORTS_ACCESS_TOKEN:
+        description: 'GitHub PAT for accessing automation reports'
+        required: false
+env:
+  NODE_VERSION: '20'
+  TZ: 'Europe/Sarajevo'
+
+jobs:
+  test:
+    name: Test (${{ matrix.suite }})
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJson(inputs.test-matrix || '["default"]') }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: |
+          echo 'fetch-retries=5' >> ./.npmrc
+          if [ -f "package-lock.json" ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-offline --no-audit --no-fund
+          fi
+          # Remove .npmrc configuration
+          if [[ "$OSTYPE" == "darwin"* ]]
+          then
+            sed -i '' -e '/fetch-retries/d' .npmrc
+          else
+            sed -i  '/fetch-retries/d' .npmrc
+          fi
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(npm list @playwright/test --depth=0 --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Build test command
+        id: build-command
+        run: |
+          COMMAND="npx playwright test"
+          SUITE_NAME="${{ matrix.suite }}"
+          echo "suite=$SUITE_NAME" >> $GITHUB_OUTPUT
+
+          if [ -n "$SUITE_NAME" ] && [ "$SUITE_NAME" != "default" ]; then
+            CONFIG_FILE="configs/${SUITE_NAME}.config.ts"
+            if [ -f "$CONFIG_FILE" ]; then
+              COMMAND="$COMMAND --config=$CONFIG_FILE"
+            else
+              COMMAND="$COMMAND tests/${{ inputs.feature-name }}/${SUITE_NAME}/"
+            fi
+          elif [ -n "${{ inputs.test-pattern }}" ]; then
+            if [[ "${{ inputs.test-pattern }}" == *.spec.ts ]]; then
+              COMMAND="$COMMAND ${{ inputs.test-pattern }}"
+            elif [[ "${{ inputs.test-pattern }}" == tests/* ]] || [[ "${{ inputs.test-pattern }}" == */ ]]; then
+              COMMAND="$COMMAND ${{ inputs.test-pattern }}"
+            elif [ "${{ inputs.test-pattern }}" = "smoke" ]; then
+              if [ -f "configs/smoke-${{ inputs.feature-name }}.config.ts" ]; then
+                COMMAND="$COMMAND --config=configs/smoke-${{ inputs.feature-name }}.config.ts"
+              else
+                COMMAND="$COMMAND tests/${{ inputs.feature-name }}/"
+              fi
+            else
+              COMMAND="$COMMAND --grep=${{ inputs.test-pattern }}"
+            fi
+          else
+            COMMAND="$COMMAND tests/${{ inputs.feature-name }}/"
+          fi
+
+          if [ "${{ inputs.headed }}" = "true" ]; then
+            COMMAND="$COMMAND --headed"
+          fi
+          if [ "${{ inputs.debug }}" = "true" ]; then
+            COMMAND="$COMMAND --debug"
+          fi
+
+          echo "command=$COMMAND" >> $GITHUB_OUTPUT
+          echo "Final command: $COMMAND"
+
+      - name: Run Playwright tests
+        env:
+          BASE_URL: ${{ inputs.base-url }}
+          NODE_ENV: ${{ inputs.environment }}
+          BROWSER_NAME: chromium
+          TZ: 'Europe/Sarajevo'
+          CI: true
+        run: ${{ steps.build-command.outputs.command }}
+
+      - name: Upload blob report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ matrix.suite }}
+          path: blob-report/
+          retention-days: 1
+
+  combine:
+    needs: [test]
+    name: Combine reports
+    if: always() && needs.test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      total_tests: ${{ steps.combine.outputs.total_tests }}
+      passed_tests: ${{ steps.combine.outputs.passed_tests }}
+      failed_tests: ${{ steps.combine.outputs.failed_tests }}
+      skipped_tests: ${{ steps.combine.outputs.skipped_tests }}
+      status: ${{ steps.combine.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Combine reports
+        id: combine
+        uses: ./.github/actions/combine-reports
+        with:
+          feature-name: ${{ inputs.feature-name }}
+          node-version: ${{ env.NODE_VERSION }}
+
+  deploy_reports:
+    needs: [combine]
+    name: Deploy reports
+    if: always() && needs.combine.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy Reports
+        uses: ./.github/actions/deploy-reports
+        env:
+          AUTOMATION_REPORTS_ACCESS_TOKEN: ${{ secrets.AUTOMATION_REPORTS_ACCESS_TOKEN }}
+        with:
+          feature-name: ${{ inputs.feature-name }}

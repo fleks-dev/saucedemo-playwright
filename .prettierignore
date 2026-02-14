@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+
+# Test reports
+playwright-report/
+playwright-reports/
+test-results/
+playwright-test-results/
+
+# Coverage
+coverage/
+
+# Fixtures (optional - remove if you want to format these)
+fixtures/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Config
+.env
+.env.*
+

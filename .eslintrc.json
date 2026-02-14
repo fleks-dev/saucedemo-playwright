@@ -1,0 +1,38 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "plugin:playwright/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "plugins": ["@typescript-eslint", "playwright"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "playwright/expect-expect": "error",
+    "playwright/no-page-pause": "error",
+    "playwright/no-element-handle": "error",
+    "playwright/no-eval": "error",
+    "playwright/no-focused-test": "error",
+    "playwright/no-force-option": "warn",
+    "playwright/no-skipped-test": "warn",
+    "playwright/no-useless-await": "error",
+    "playwright/prefer-web-first-assertions": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    "test-results/",
+    "playwright-report/",
+    "playwright-test-results/"
+  ]
+}

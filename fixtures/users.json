@@ -1,0 +1,25 @@
+{
+  "staging": {
+    "default": {
+      "username": "standard_user"
+    },
+    "lockedOutUser": {
+      "username": "locked_out_user"
+    },
+    "problemUser": {
+      "username": "problem_user"
+    },
+    "performanceGlitchUser": {
+      "username": "performance_glitch_user"
+    },
+    "errorUser": {
+      "username": "error_user"
+    },
+    "visualUser": {
+      "username": "visual_user"
+    }
+  }
+}
+
+
+

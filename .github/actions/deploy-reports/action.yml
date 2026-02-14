@@ -1,0 +1,57 @@
+name: 'Deploy Playwright Reports'
+description: 'Deploys Playwright test reports to GitHub Pages using JamesIves action'
+
+inputs:
+  feature-name:
+    description: 'Feature name for report path'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download report artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: playwright-report-${{ inputs.feature-name }}
+        path: report
+
+    - name: Checkout Reports Repository
+      if: always()
+      uses: actions/checkout@v4
+      with:
+        repository: fleks-dev/saucedemo-reports
+        ref: 'main'
+        path: saucedemo-reports
+        token: ${{ env.AUTOMATION_REPORTS_ACCESS_TOKEN }}
+        fetch-depth: 1
+
+    - name: Prepare reports for GitHub Pages
+      if: always()
+      id: prepare_reports
+      shell: bash
+      env:
+        TZ: 'Europe/Sarajevo'
+      run: |
+        DATESTAMP=$(date +%Y-%m-%d)
+        echo "DATESTAMP=$DATESTAMP" >> "$GITHUB_OUTPUT"
+        mkdir playwright-report-deploy
+
+        # Copy playwright-report contents to root for direct access to index.html
+        if [ -d "report/playwright-report" ]; then
+          cp -r report/playwright-report/* playwright-report-deploy/
+        else
+          cp -r report/* playwright-report-deploy/
+        fi
+
+    - name: Deploy to GitHub Pages
+      if: always()
+      uses: JamesIves/github-pages-deploy-action@v4.6.1
+      with:
+        repository-name: fleks-dev/saucedemo-reports
+        token: ${{ env.AUTOMATION_REPORTS_ACCESS_TOKEN }}
+        branch: main
+        folder: playwright-report-deploy
+        target-folder: reports/${{ steps.prepare_reports.outputs.DATESTAMP }}/${{ (inputs.feature-name == 'manual') && 'manual-triggers' || inputs.feature-name }}/${{ github.run_id }}

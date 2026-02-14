@@ -1,0 +1,42 @@
+{
+  "name": "playwright-boilerplate",
+  "version": "1.0.0",
+  "description": "Zero tears Playwright boilerplate",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "test:ui": "npx playwright test --ui",
+    "test:config": "npx playwright test --config=configs/${CONFIG_NAME}.config.ts",
+    "test:config:headed": "npx playwright test --config=configs/${CONFIG_NAME}.config.ts --headed",
+    "test:suite": "npx playwright test tests/${SUITE_PATH}",
+    "test:suite:headed": "npx playwright test tests/${SUITE_PATH} --headed",
+    "install": "npx playwright install",
+    "install:deps": "npx playwright install --with-deps",
+    "show-report": "npx playwright show-report",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf test-results/ playwright-report/ playwright-test-results/"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "dotenv": "^16.0.0",
+    "eslint": "^8.0.0",
+    "eslint-plugin-playwright": "^0.18.0",
+    "moment": "^2.30.1",
+    "pg": "^8.16.3",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.1",
+    "@faker-js/faker": "^9.9.0",
+    "crypto-js": "^4.2.0"
+  }
+}
