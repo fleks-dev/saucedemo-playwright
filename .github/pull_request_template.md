@@ -16,7 +16,6 @@ _Briefly describe the purpose of the PR. What problem does it solve? What functi
 
 - [ ] Smoke tests related to the changes are passing successfully (if applicable).
 - [ ] Successfully completed 5 test runs.
-- [ ] Updated or added the test cases in Testmo to reflect the changes (if new or changed).
 
 ## Screenshots (if applicable)
 
